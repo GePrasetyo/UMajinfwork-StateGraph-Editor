@@ -1,0 +1,19 @@
+{
+  "name": "com.majingari.stategraph",
+  "displayName": "Majingari State Graph",
+  "version": "0.0.1-preview",
+  "description": "Majingari State Graph.",
+  "unity": "6000.3",
+  "unityRelease": "1f1",
+  "documentationUrl": "https://github.com/GePrasetyo/UMajinfwork-StateGraph-Editor/wiki/Documentation",
+  "changelogUrl": "https://github.com/GePrasetyo/UMajinfwork-StateGraph-Editor/wiki/Changelog",
+  "licensesUrl": "https://github.com/GePrasetyo/UMajinfwork-StateGraph-Editor/blob/main/LICENSE",
+  "dependencies": {
+
+  },
+  "author": {
+    "name": "Dhimas Prasetyo",
+    "url": "https://github.com/GePrasetyo/Unity-Majinfwork",
+    "email": "dhimasgppantoja@gmail.com"
+  }
+}

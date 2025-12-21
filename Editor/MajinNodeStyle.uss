@@ -1,0 +1,23 @@
+/* Force the Node width */
+.unity-node #node-border {
+    min-width: 240px;
+    max-width: 240px;
+}
+
+/* Force the extension container (where fields live) to wrap */
+.unity-node #extension {
+    background-color: rgba(40, 40, 40, 0.8);
+    padding: 4px;
+}
+
+/* Force text fields to wrap instead of stretching horizontally */
+.unity-base-text-field__input {
+    white-space: normal;
+    flex-wrap: wrap;
+}
+
+/* Optional: Make the title look cleaner with the fixed width */
+.unity-node #title {
+    height: 30px;
+    justify-content: center;
+}
