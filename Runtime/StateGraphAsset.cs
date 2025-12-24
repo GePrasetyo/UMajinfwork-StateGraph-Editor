@@ -9,7 +9,6 @@ namespace Majinfwork.StateGraph {
         public List<StateNodeAsset> allStates = new List<StateNodeAsset>();
         public bool SharedAsset;
 
-        // Creates a unique copy of the entire graph for a specific Bot
         public StateGraphAsset Clone() {
             StateGraphAsset newGraph = Instantiate(this);
             newGraph.allStates = new List<StateNodeAsset>();

@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace Majinfwork.StateGraph {
     public sealed class WaitState : StateNodeAsset {
         public StateTransition Exit;
@@ -10,7 +12,7 @@ namespace Majinfwork.StateGraph {
         }
 
         public override void Tick(StateRunner owner) { 
-            timer -= waitTime;
+            timer -= Time.deltaTime;
 
             if (timer < 0) {
                 Trigger(Exit);

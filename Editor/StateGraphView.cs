@@ -9,18 +9,19 @@ using UnityEngine.UIElements;
 
 namespace Majinfwork.StateGraph {
     public class StateGraphView : GraphView {
-        private StateGraphAsset _asset;
-        private NodeSearchWindow _searchWindow;
+        private StateGraphAsset asset;
+        private NodeSearchWindow searchWindow;
+
+        private string lastActiveGuid;
 
         public StateGraphView(EditorWindow window) {
             style.flexGrow = 1;
             Insert(0, new GridBackground());
-            
-            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("packages://com.majingari.stategraph/Editor/MajinNodeStyle.uss");
+            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Packages/com.majingari.stategraph/Editor/MNodeStyle.uss");
 
             if (styleSheet == null) {
                 // This searches for the file by name anywhere in the project/package
-                string[] guids = AssetDatabase.FindAssets("MajinNodeStyle t:StyleSheet");
+                string[] guids = AssetDatabase.FindAssets("MNodeStyle t:StyleSheet");
                 if (guids.Length > 0) {
                     string path = AssetDatabase.GUIDToAssetPath(guids[0]);
                     styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(path);
@@ -36,9 +37,9 @@ namespace Majinfwork.StateGraph {
             this.AddManipulator(new RectangleSelector());
             SetupZoom(ContentZoomer.DefaultMinScale, ContentZoomer.DefaultMaxScale);
 
-            _searchWindow = ScriptableObject.CreateInstance<NodeSearchWindow>();
-            _searchWindow.Init(this, window);
-            nodeCreationRequest = ctx => SearchWindow.Open(new SearchWindowContext(ctx.screenMousePosition), _searchWindow);
+            searchWindow = ScriptableObject.CreateInstance<NodeSearchWindow>();
+            searchWindow.Init(this, window);
+            nodeCreationRequest = ctx => SearchWindow.Open(new SearchWindowContext(ctx.screenMousePosition), searchWindow);
 
             serializeGraphElements = MySerializeMethod;
             canPasteSerializedData = MyCanPasteMethod;
@@ -59,19 +60,19 @@ namespace Majinfwork.StateGraph {
         }
 
         private void SetEntryNode(StateNodeVisual node) {
-            _asset.entryNodeGuid = node.data.guid;
+            asset.entryNodeGuid = node.data.guid;
             RefreshNodeVisuals();
         }
 
         public void Populate(StateGraphAsset asset) {
-            _asset = asset;
-            _asset.allStates.RemoveAll(s => s == null);
+            this.asset = asset;
+            this.asset.allStates.RemoveAll(s => s == null);
             graphElements.ForEach(RemoveElement);
 
             Dictionary<string, StateNodeVisual> visualNodes = new Dictionary<string, StateNodeVisual>();
 
             // 1. Create all Visual Nodes
-            foreach (var data in _asset.allStates) {
+            foreach (var data in this.asset.allStates) {
                 if (data == null) continue;
                 var visualNode = new StateNodeVisual(data);
                 visualNodes.Add(data.guid, visualNode);
@@ -79,7 +80,7 @@ namespace Majinfwork.StateGraph {
             }
 
             // 2. Create Edges by reflecting over StateTransition fields
-            foreach (var data in _asset.allStates) {
+            foreach (var data in this.asset.allStates) {
                 var sourceVisual = visualNodes[data.guid];
 
                 // Look for fields of type StateTransition
@@ -100,12 +101,11 @@ namespace Majinfwork.StateGraph {
             }
 
             RefreshNodeVisuals();
-            FrameAll();
         }
 
         private void RefreshNodeVisuals() {
             graphElements.ForEach(e => {
-                if (e is StateNodeVisual v) v.MarkAsEntry(v.data.guid == _asset.entryNodeGuid);
+                if (e is StateNodeVisual v) v.MarkAsEntry(v.data.guid == asset.entryNodeGuid);
             });
         }
 
@@ -119,8 +119,8 @@ namespace Majinfwork.StateGraph {
 
                         // CRITICAL: Mark the node and the main asset as dirty
                         EditorUtility.SetDirty(node.data);
-                        if (_asset != null) {
-                            EditorUtility.SetDirty(_asset);
+                        if (asset != null) {
+                            EditorUtility.SetDirty(asset);
                         }
                     }
                 }
@@ -141,45 +141,36 @@ namespace Majinfwork.StateGraph {
 
                         field.SetValue(source.data, trans);
                         EditorUtility.SetDirty(source.data);
-                        if (_asset != null) EditorUtility.SetDirty(_asset); // Dirty main asset
+                        if (asset != null) EditorUtility.SetDirty(asset); // Dirty main asset
                     }
                 }
             }
 
             // 3. Handle Deletion
             if (change.elementsToRemove != null) {
+                Undo.RecordObject(asset, "Delete Nodes");
+
                 foreach (var element in change.elementsToRemove) {
                     if (element is StateNodeVisual visual) {
                         StateNodeAsset dataToRemove = visual.data;
 
                         // 1. Clean up references in other nodes
-                        foreach (var state in _asset.allStates) {
+                        foreach (var state in asset.allStates) {
                             if (state == null || state == dataToRemove) continue;
+                            Undo.RecordObject(state, "Clean References");
                             ClearReferencesTo(state, dataToRemove.guid);
                         }
 
                         // 2. Remove from the list
-                        _asset.allStates.Remove(dataToRemove);
-
-                        // 3. EXPLICITLY remove from the Asset Container
-                        // This is the step that stops them from appearing under the Graph Asset
-                        AssetDatabase.RemoveObjectFromAsset(dataToRemove);
-
-                        // 4. Destroy and register Undo
+                        asset.allStates.Remove(dataToRemove);
                         Undo.DestroyObjectImmediate(dataToRemove);
                     }
                 }
 
-                // 5. CRITICAL: Force Unity to rebuild the asset hierarchy view
-                EditorUtility.SetDirty(_asset);
-                AssetDatabase.SaveAssets();
-
-                // This line forces the Project window to refresh the sub-asset list
-                AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(_asset));
+                //Set dirty changes
+                EditorUtility.SetDirty(asset);
             }
 
-            // Force a save to disk so it persists across sessions
-            AssetDatabase.SaveAssets();
             return change;
         }
 
@@ -189,12 +180,18 @@ namespace Majinfwork.StateGraph {
             newNode.guid = Guid.NewGuid().ToString();
             newNode.position = pos;
 
-            AssetDatabase.AddObjectToAsset(newNode, _asset);
-            _asset.allStates.Add(newNode);
+            AssetDatabase.AddObjectToAsset(newNode, asset);
+            asset.allStates.Add(newNode);
 
-            if (string.IsNullOrEmpty(_asset.entryNodeGuid)) _asset.entryNodeGuid = newNode.guid;
+            if (string.IsNullOrEmpty(asset.entryNodeGuid)) asset.entryNodeGuid = newNode.guid;
 
-            Populate(_asset); // Refresh the whole graph to ensure ports align
+            Populate(asset);
+        }
+
+        public void ReFrameView() {
+            schedule.Execute(() => {
+                FrameAll();
+            }).ExecuteLater(50);
         }
 
         public override List<Port> GetCompatiblePorts(Port startPort, NodeAdapter nodeAdapter) {
@@ -233,8 +230,8 @@ namespace Majinfwork.StateGraph {
                     ClearTransitionData(newData);
 
                     // Add to the asset container
-                    AssetDatabase.AddObjectToAsset(newData, _asset);
-                    _asset.allStates.Add(newData);
+                    AssetDatabase.AddObjectToAsset(newData, asset);
+                    asset.allStates.Add(newData);
                     Undo.RegisterCreatedObjectUndo(newData, "Duplicate Node");
 
                     // Create and add the new visual node
@@ -275,19 +272,18 @@ namespace Majinfwork.StateGraph {
             }
         }
 
+        // Remove all unused Nodes
         public void PurgeOrphanedNodes() {
-            if (_asset == null) return;
-
-            // Get the path to the main asset
-            string path = AssetDatabase.GetAssetPath(_asset);
+            if (asset == null) return;
 
             // Load ALL sub-assets of this file
+            string path = AssetDatabase.GetAssetPath(asset);
             UnityEngine.Object[] subAssets = AssetDatabase.LoadAllAssetsAtPath(path);
 
             bool changed = false;
             foreach (var sub in subAssets) {
                 // If the sub-asset is a Node but NOT in our allStates list, it's an orphan
-                if (sub is StateNodeAsset node && !_asset.allStates.Contains(node)) {
+                if (sub is StateNodeAsset node && !asset.allStates.Contains(node)) {
                     AssetDatabase.RemoveObjectFromAsset(node);
                     UnityEngine.Object.DestroyImmediate(node, true);
                     changed = true;
@@ -295,11 +291,27 @@ namespace Majinfwork.StateGraph {
             }
 
             if (changed) {
-                EditorUtility.SetDirty(_asset);
+                EditorUtility.SetDirty(asset);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.ImportAsset(path);
-                Debug.Log("Purged orphaned state nodes from asset.");
             }
+        }
+
+        // Highlight Active State To Debug
+        public void HighlightActiveState(string activeGuid) {
+            if (lastActiveGuid == activeGuid) return;
+            lastActiveGuid = activeGuid;
+
+            graphElements.ForEach(element => {
+                if (element is StateNodeVisual visual) {
+                    if (visual.data.guid == activeGuid) {
+                        visual.AddToClassList("node-running");
+                    }
+                    else {
+                        visual.RemoveFromClassList("node-running");
+                    }
+                }
+            });
         }
     }
 }

@@ -1,0 +1,32 @@
+/* Use the class we added in C# to target our nodes */
+.majin-node #node-border {
+    min-width: 200px;
+    max-width: 300px;
+    background-color: #2b2b2b;
+    border-radius: 8px;
+}
+
+/* This targets the title bar specifically */
+.majin-node #title {
+    background-color: #383838;
+    height: 40px;
+}
+
+/* THE DEBUG HIGHLIGHT */
+/* When we add 'node-running' in C#, this kicks in */
+.majin-node.node-running #node-border {
+    border-left-color: #00FF00;
+    border-right-color: #00FF00;
+    border-top-color: #00FF00;
+    border-bottom-color: #00FF00;
+    border-left-width: 4px;
+    border-right-width: 4px;
+    border-top-width: 4px;
+    border-bottom-width: 4px;
+}
+
+/* Ensure the property fields inside don't break the layout */
+.majin-node #extension {
+    background-color: rgba(45, 45, 45, 0.9);
+    padding: 8px;
+}
