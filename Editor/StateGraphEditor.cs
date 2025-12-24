@@ -1,7 +1,6 @@
 using System.Reflection;
 using UnityEditor;
 using UnityEditor.Callbacks;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 
 namespace Majinfwork.StateGraph {
@@ -11,6 +10,7 @@ namespace Majinfwork.StateGraph {
 
         [OnOpenAsset]
         public static bool OnOpenAsset(int instanceID, int line) {
+#if UNITY_6000_3_OR_NEWER
             if (EditorUtility.EntityIdToObject(instanceID) is StateGraphAsset asset) {
                 var window = GetWindow<StateGraphEditor>("State Machine");
                 window.minSize = new Vector2(800, 600);
@@ -21,6 +21,19 @@ namespace Majinfwork.StateGraph {
                 window.LoadAsset(asset);
                 return true;
             }
+#else
+            if (EditorUtility.InstanceIDToObject(instanceID) is StateGraphAsset asset) {
+                var window = GetWindow<StateGraphEditor>("State Machine");
+                window.minSize = new Vector2(800, 600);
+                if (window.position.width < 200 || window.position.height < 200) {
+                    window.position = new Rect(100, 100, 1024, 768);
+                }
+
+                window.LoadAsset(asset);
+                return true;
+            }
+#endif
+
             return false;
         }
 

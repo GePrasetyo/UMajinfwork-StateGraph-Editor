@@ -3,7 +3,7 @@ using System.Reflection;
 using UnityEngine;
 
 namespace Majinfwork.StateGraph {
-    [CreateAssetMenu(fileName = "NewStateGraph", menuName = "State Machine/Graph Asset")]
+    [CreateAssetMenu(fileName = "NewStateGraph", menuName = "MFramework/State Machine/Graph Asset")]
     public class StateGraphAsset : ScriptableObject {
         public string entryNodeGuid;
         public List<StateNodeAsset> allStates = new List<StateNodeAsset>();

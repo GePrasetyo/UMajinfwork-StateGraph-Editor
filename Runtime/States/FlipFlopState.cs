@@ -7,18 +7,18 @@ namespace Majinfwork.StateGraph {
 
         public int index;
 
-        public override void Begin(StateRunner owner) {
+        public override void Begin() {
             index++;
 
             if (index % 2 == 0) {
-                Trigger(ExitB);
+                TriggerExit(ExitB);
             }
             else {
-                Trigger(ExitA);
+                TriggerExit(ExitA);
             }
         }
 
-        public override void Tick(StateRunner owner) { }
-        public override void End(StateRunner owner) { }
+        public override void Tick() { }
+        public override void End() { }
     }
 }

@@ -7,18 +7,18 @@ namespace Majinfwork.StateGraph {
         public float waitTime;
         private float timer;
 
-        public override void Begin(StateRunner owner) {
+        public override void Begin() {
             timer = waitTime;
         }
 
-        public override void Tick(StateRunner owner) { 
+        public override void Tick() { 
             timer -= Time.deltaTime;
 
             if (timer < 0) {
-                Trigger(Exit);
+                TriggerExit(Exit);
             }
         }
 
-        public override void End(StateRunner owner) { }
+        public override void End() { }
     }
 }

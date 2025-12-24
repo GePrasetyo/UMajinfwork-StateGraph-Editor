@@ -7,12 +7,12 @@ using UnityEngine.UIElements;
 
 namespace Majinfwork.StateGraph {
     public class NodeSearchWindow : ScriptableObject, ISearchWindowProvider {
-        private StateGraphView _graphView;
-        private EditorWindow _window;
+        private StateGraphView graphView;
+        private EditorWindow window;
 
         public void Init(StateGraphView graphView, EditorWindow window) {
-            _graphView = graphView;
-            _window = window;
+            this.graphView = graphView;
+            this.window = window;
         }
 
         public List<SearchTreeEntry> CreateSearchTree(SearchWindowContext context) {
@@ -30,11 +30,11 @@ namespace Majinfwork.StateGraph {
         }
 
         public bool OnSelectEntry(SearchTreeEntry entry, SearchWindowContext context) {
-            var mousePosition = _window.rootVisualElement.ChangeCoordinatesTo(
-                _window.rootVisualElement.parent, context.screenMousePosition - _window.position.position);
-            var graphMousePosition = _graphView.contentViewContainer.WorldToLocal(mousePosition);
+            var mousePosition = window.rootVisualElement.ChangeCoordinatesTo(
+                window.rootVisualElement.parent, context.screenMousePosition - window.position.position);
+            var graphMousePosition = graphView.contentViewContainer.WorldToLocal(mousePosition);
 
-            _graphView.CreateNode((Type)entry.userData, graphMousePosition);
+            graphView.CreateNode((Type)entry.userData, graphMousePosition);
             return true;
         }
     }

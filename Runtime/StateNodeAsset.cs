@@ -9,11 +9,11 @@ namespace Majinfwork.StateGraph {
         // The Runner will subscribe to this to know when a transition is requested
         public Action<StateTransition> onTransitionTriggered;
 
-        public abstract void Begin(StateRunner owner);
-        public abstract void Tick(StateRunner owner);
-        public abstract void End(StateRunner owner);
+        public abstract void Begin();
+        public abstract void Tick();
+        public abstract void End();
 
-        protected void Trigger(StateTransition transition) {
+        protected void TriggerExit(StateTransition transition) {
             onTransitionTriggered?.Invoke(transition);
         }
     }

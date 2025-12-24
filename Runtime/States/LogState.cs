@@ -8,12 +8,12 @@ namespace Majinfwork.StateGraph {
         public Color logColor = Color.white;
         
 
-        public override void Begin(StateRunner owner) {
+        public override void Begin() {
             Debug.Log(message);
-            Trigger(Exit);
+            TriggerExit(Exit);
         }
 
-        public override void Tick(StateRunner owner) { }
-        public override void End(StateRunner owner) { }
+        public override void Tick() { }
+        public override void End() { }
     }
 }

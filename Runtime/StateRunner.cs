@@ -10,35 +10,28 @@ namespace Majinfwork.StateGraph {
 
         public StateNodeAsset CurrentState => activeState;
 
-        void Awake() {
-            if (graphTemplate != null) {
-                runtimeGraph = graphTemplate.SharedAsset ? graphTemplate : graphTemplate.Clone();
-            }
-        }
-
         void Start() {
-            if (runtimeGraph == null) return;
-
-            var entry = runtimeGraph.allStates.FirstOrDefault(s => s.guid == runtimeGraph.entryNodeGuid);
-            if (entry != null) {
-                TransitionTo(entry);
+            if (graphTemplate != null) {
+                SetRuntimeGraph(graphTemplate.SharedAsset ? graphTemplate : graphTemplate.Clone());
             }
         }
 
         void Update() {
+            if (runtimeGraph == null) return;
+
             if (newStateBegin) {
                 newStateBegin = false;
-                activeState?.Begin(this);
+                activeState?.Begin();
             }
             else {
-                activeState?.Tick(this);
+                activeState?.Tick();
             }
         } 
 
         public void TransitionTo(StateNodeAsset next) {
             if (activeState != null) {
                 activeState.onTransitionTriggered -= OnStateRequestedTransition;
-                activeState.End(this);
+                activeState.End();
             }
 
             if (next != null) {
@@ -51,6 +44,19 @@ namespace Majinfwork.StateGraph {
 
         private void OnStateRequestedTransition(StateTransition transition) {
             if (transition.targetState != null) TransitionTo(transition.targetState);
+        }
+
+        public void SetGraph(StateGraphAsset asset) {
+            graphTemplate = asset;
+        }
+
+        public void SetRuntimeGraph(StateGraphAsset asset) {
+            runtimeGraph = asset;
+
+            var entry = runtimeGraph.allStates.FirstOrDefault(s => s.guid == runtimeGraph.entryNodeGuid);
+            if (entry != null) {
+                TransitionTo(entry);
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEditor.UIElements;
@@ -31,7 +32,6 @@ namespace Majinfwork.StateGraph {
             }
 
             AddToClassList("majin-node");
-
             RefreshExpandedState();
             RefreshPorts();
 
@@ -67,15 +67,6 @@ namespace Majinfwork.StateGraph {
 
         public void MarkAsEntry(bool isEntry) {
             style.backgroundColor = isEntry ? new Color(0.15f, 0.35f, 0.15f) : new Color(0.22f, 0.22f, 0.22f);
-        }
-
-        public void SetAsRunning(bool isRunning) {
-            if (isRunning) {
-                AddToClassList("node-running");
-            }
-            else {
-                RemoveFromClassList("node-running");
-            }
         }
     }
 }
