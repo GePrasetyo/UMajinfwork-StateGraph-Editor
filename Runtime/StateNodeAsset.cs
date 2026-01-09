@@ -13,6 +13,8 @@ namespace Majinfwork.StateGraph {
         public abstract void Tick();
         public abstract void End();
 
+        public virtual void ResetNode() { }
+
         protected void TriggerExit(StateTransition transition) {
             onTransitionTriggered?.Invoke(transition);
         }

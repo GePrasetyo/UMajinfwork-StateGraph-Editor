@@ -9,6 +9,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.majingari.framework",
+            "expression": "",
+            "define": "HAS_MAJINFWORK_CROSSREF"
+        }
+    ],
     "noEngineReferences": false
 }
