@@ -1,6 +1,6 @@
 # 🕸️ Majingari State Graph
 
-**Majingari State Graph** is a visual scripting tool for Unity designed to create modular, ScriptableObject-based state machines. It provides a robust editor window for designing logic flows and a runtime runner to execute them.
+**Majingari State Graph** is a **barebone** visual scripting tool for Unity designed for developers who prefer a minimalist starting point. It provides the essential infrastructure for ScriptableObject-based state machines while remaining intentionally lightweight, allowing you to expand the logic without dealing with bloated, unnecessary features.
 
 <img width="1695" height="893" alt="image" src="https://github.com/user-attachments/assets/53938a0d-2ba2-40fe-bf1a-d7b321cc2f1a" />
 
