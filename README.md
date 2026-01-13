@@ -1,7 +1,3 @@
-Below is a comprehensive **GitHub README.md** for the **Majingari State Graph** repository, drawing from the source code and architecture. It follows standard GitHub formatting and highlights the system's integration with the core Majingari Framework.
-
----
-
 # 🕸️ Majingari State Graph
 
 **Majingari State Graph** is a visual scripting tool for Unity designed to create modular, ScriptableObject-based state machines. It provides a robust editor window for designing logic flows and a runtime runner to execute them.
