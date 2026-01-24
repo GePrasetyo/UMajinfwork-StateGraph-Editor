@@ -1,5 +1,11 @@
 # 🕸️ Majinfwork - Unity State Graph
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Unity-6.3%2B-black?style=flat-square&logo=unity" alt="Unity 6.3+"/>
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License"/>
+  <img src="https://img.shields.io/badge/Version-0.0.1--preview-blue?style=flat-square" alt="Version"/>
+</p>
+
 **Majinfwork State Graph** is a **barebone** visual scripting tool for Unity designed for developers who prefer a minimalist starting point. It provides the essential infrastructure for ScriptableObject-based state machines while remaining intentionally lightweight, allowing you to expand the logic without dealing with bloated, unnecessary features.
 
 <img width="1695" height="893" alt="image" src="https://github.com/user-attachments/assets/53938a0d-2ba2-40fe-bf1a-d7b321cc2f1a" />
