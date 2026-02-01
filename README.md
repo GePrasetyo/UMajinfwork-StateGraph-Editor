@@ -97,8 +97,3 @@ If you are using the core **Majingari Framework**, the State Graph automatically
 ## ⚙️ Requirements
 *   **Unity:** 6000.3.1f1 or newer.
 *   **Dependencies:** Core Majingari Framework (Optional, for cross-scene support).
-
----
-
-**Analogy for Understanding:**
-Think of the **State Graph** as a **Train Track Layout**. The `StateGraphAsset` is the **Map** of the entire station. Each `StateNodeAsset` is a **Station Stop** where specific actions happen (like picking up passengers). The `StateRunner` is the **Train** itself, moving from station to station based on the tracks (Transitions) you laid out in the editor.
