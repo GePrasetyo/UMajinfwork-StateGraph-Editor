@@ -90,9 +90,12 @@ namespace Majinfwork.StateGraph {
                         var transition = field.GetValue(data) as StateTransition;
                         if (transition != null && !string.IsNullOrEmpty(transition.targetNodeGuid)) {
                             if (visualNodes.TryGetValue(transition.targetNodeGuid, out var targetVisual)) {
-                                // Find the port that matches this field name
                                 var port = sourceVisual.transitionPorts[field.Name];
-                                var edge = port.ConnectTo(targetVisual.inputPort);
+                                var edge = new StateEdge();
+                                edge.output = port;
+                                edge.input = targetVisual.inputPort;
+                                port.Connect(edge);
+                                targetVisual.inputPort.Connect(edge);
                                 AddElement(edge);
                             }
                         }
@@ -101,6 +104,7 @@ namespace Majinfwork.StateGraph {
             }
 
             RefreshNodeVisuals();
+
         }
 
         private void RefreshNodeVisuals() {
@@ -114,20 +118,29 @@ namespace Majinfwork.StateGraph {
             if (change.movedElements != null) {
                 foreach (var element in change.movedElements) {
                     if (element is StateNodeVisual node) {
-                        // Update the ScriptableObject data with the new position
                         node.data.position = node.GetPosition().position;
-
-                        // CRITICAL: Mark the node and the main asset as dirty
                         EditorUtility.SetDirty(node.data);
                         if (asset != null) {
                             EditorUtility.SetDirty(asset);
                         }
                     }
                 }
+
             }
 
             // 2. Handle Edge Creation
             if (change.edgesToCreate != null) {
+                // Replace default edges with StateEdge for better curve routing
+                for (int i = 0; i < change.edgesToCreate.Count; i++) {
+                    var old = change.edgesToCreate[i];
+                    if (old is not StateEdge) {
+                        var stateEdge = new StateEdge();
+                        stateEdge.output = old.output;
+                        stateEdge.input = old.input;
+                        change.edgesToCreate[i] = stateEdge;
+                    }
+                }
+
                 foreach (var edge in change.edgesToCreate) {
                     var source = edge.output.node as StateNodeVisual;
                     var target = edge.input.node as StateNodeVisual;
