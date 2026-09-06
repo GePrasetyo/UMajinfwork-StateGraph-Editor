@@ -9,20 +9,17 @@ namespace Majinfwork.StateGraph {
         private StateGraphAsset currentAsset; 
 
         [OnOpenAsset]
+#if UNITY_6000_6_OR_NEWER
+        public static bool OnOpenAsset(EntityId entityID, int line) {
+            var target = EditorUtility.EntityIdToObject(entityID);
+#elif UNITY_6000_3_OR_NEWER
         public static bool OnOpenAsset(int instanceID, int line) {
-#if UNITY_6000_3_OR_NEWER
-            if (EditorUtility.EntityIdToObject(instanceID) is StateGraphAsset asset) {
-                var window = GetWindow<StateGraphEditor>("State Machine");
-                window.minSize = new Vector2(800, 600);
-                if (window.position.width < 200 || window.position.height < 200) {
-                    window.position = new Rect(100, 100, 1024, 768);
-                }
-
-                window.LoadAsset(asset);
-                return true;
-            }
+            var target = EditorUtility.EntityIdToObject(instanceID);
 #else
-            if (EditorUtility.InstanceIDToObject(instanceID) is StateGraphAsset asset) {
+        public static bool OnOpenAsset(int instanceID, int line) {
+            var target = EditorUtility.InstanceIDToObject(instanceID);
+#endif
+            if (target is StateGraphAsset asset) {
                 var window = GetWindow<StateGraphEditor>("State Machine");
                 window.minSize = new Vector2(800, 600);
                 if (window.position.width < 200 || window.position.height < 200) {
@@ -32,7 +29,6 @@ namespace Majinfwork.StateGraph {
                 window.LoadAsset(asset);
                 return true;
             }
-#endif
 
             return false;
         }
