@@ -116,16 +116,19 @@ namespace Majinfwork.StateGraph {
         private GraphViewChange OnGraphChanged(GraphViewChange change) {
             // 1. Handle Node Movement
             if (change.movedElements != null) {
-                foreach (var element in change.movedElements) {
-                    if (element is StateNodeVisual node) {
+                var moved = change.movedElements.OfType<StateNodeVisual>().Where(v => v.data != null).ToList();
+                if (moved.Count > 0) {
+                    Undo.RecordObjects(moved.Select(v => (UnityEngine.Object)v.data).ToArray(), "Move Nodes");
+
+                    foreach (var node in moved) {
                         node.data.position = node.GetPosition().position;
                         EditorUtility.SetDirty(node.data);
-                        if (asset != null) {
-                            EditorUtility.SetDirty(asset);
-                        }
+                    }
+
+                    if (asset != null) {
+                        EditorUtility.SetDirty(asset);
                     }
                 }
-
             }
 
             // 2. Handle Edge Creation
@@ -144,10 +147,12 @@ namespace Majinfwork.StateGraph {
                 foreach (var edge in change.edgesToCreate) {
                     var source = edge.output.node as StateNodeVisual;
                     var target = edge.input.node as StateNodeVisual;
+                    if (source?.data == null || target?.data == null) continue;
                     string fieldName = edge.output.viewDataKey;
 
                     var field = source.data.GetType().GetField(fieldName);
                     if (field != null) {
+                        Undo.RecordObject(source.data, "Connect Nodes");
                         var trans = field.GetValue(source.data) as StateTransition ?? new StateTransition();
                         trans.targetNodeGuid = target.data.guid;
                         trans.targetState = target.data;
@@ -161,8 +166,30 @@ namespace Majinfwork.StateGraph {
 
             // 3. Handle Deletion
             if (change.elementsToRemove != null) {
-                Undo.RecordObject(asset, "Delete Nodes");
+                Undo.RecordObject(asset, "Delete Graph Elements");
 
+                // Nodes disappearing in this same change are destroyed below, so
+                // their outgoing edges need no field cleanup.
+                var removedNodes = new HashSet<StateNodeAsset>(
+                    change.elementsToRemove.OfType<StateNodeVisual>().Select(v => v.data));
+
+                // 3a. A deleted edge must clear the transition it represents.
+                // Otherwise Populate() rebuilds it from the stale field and the
+                // deletion appears to undo itself.
+                foreach (var element in change.elementsToRemove) {
+                    if (element is not Edge edge) continue;
+                    if (edge.output?.node is not StateNodeVisual source) continue;
+                    if (source.data == null || removedNodes.Contains(source.data)) continue;
+
+                    var field = source.data.GetType().GetField(edge.output.viewDataKey);
+                    if (field == null || field.FieldType != typeof(StateTransition)) continue;
+
+                    Undo.RecordObject(source.data, "Disconnect Nodes");
+                    field.SetValue(source.data, new StateTransition());
+                    EditorUtility.SetDirty(source.data);
+                }
+
+                // 3b. Removed nodes
                 foreach (var element in change.elementsToRemove) {
                     if (element is StateNodeVisual visual) {
                         StateNodeAsset dataToRemove = visual.data;
@@ -227,39 +254,91 @@ namespace Majinfwork.StateGraph {
         private void MyPasteMethod(string operationName, string data) {
             string[] guids = data.Split(',');
 
+            // Pass 1: clone every pasted node, remembering old guid -> clone.
+            var clonesByOldGuid = new Dictionary<string, StateNodeAsset>();
+            var clones = new List<StateNodeAsset>();
+
             foreach (var guid in guids) {
                 // Find the original visual node to get its data
                 var original = graphElements.OfType<StateNodeVisual>()
-                    .FirstOrDefault(v => v.data.guid == guid);
+                    .FirstOrDefault(v => v.data != null && v.data.guid == guid);
 
-                if (original != null) {
-                    // Create a NEW instance of the ScriptableObject
-                    var newData = UnityEngine.Object.Instantiate(original.data);
-                    newData.name = original.data.name;
-                    newData.guid = Guid.NewGuid().ToString(); // New ID is critical
-                    newData.position = original.data.position + new Vector2(40, 40);
+                if (original == null || clonesByOldGuid.ContainsKey(guid)) continue;
 
-                    // Clear transitions in the duplicate
-                    ClearTransitionData(newData);
+                // Create a NEW instance of the ScriptableObject
+                var newData = UnityEngine.Object.Instantiate(original.data);
+                newData.name = original.data.name;
+                newData.guid = Guid.NewGuid().ToString(); // New ID is critical
+                newData.position = original.data.position + new Vector2(40, 40);
 
-                    // Add to the asset container
-                    AssetDatabase.AddObjectToAsset(newData, asset);
-                    asset.allStates.Add(newData);
-                    Undo.RegisterCreatedObjectUndo(newData, "Duplicate Node");
+                // Add to the asset container
+                AssetDatabase.AddObjectToAsset(newData, asset);
+                asset.allStates.Add(newData);
+                Undo.RegisterCreatedObjectUndo(newData, "Duplicate Node");
 
-                    // Create and add the new visual node
-                    var newVisual = new StateNodeVisual(newData);
-                    AddElement(newVisual);
-                    newVisual.Select(this, true);
+                clonesByOldGuid.Add(guid, newData);
+                clones.Add(newData);
+            }
+
+            if (clones.Count == 0) return;
+
+            // Pass 2: links pointing inside the pasted set survive (remapped onto
+            // the clones); links pointing outside it are dropped.
+            foreach (var clone in clones) {
+                RemapTransitionData(clone, clonesByOldGuid);
+            }
+
+            // Pass 3: build the visuals, then draw the surviving links.
+            var visualsByGuid = new Dictionary<string, StateNodeVisual>();
+            foreach (var clone in clones) {
+                var visual = new StateNodeVisual(clone);
+                AddElement(visual);
+                visualsByGuid.Add(clone.guid, visual);
+            }
+
+            foreach (var clone in clones) {
+                var sourceVisual = visualsByGuid[clone.guid];
+
+                foreach (var field in GetTransitionFields(clone)) {
+                    if (field.GetValue(clone) is not StateTransition trans) continue;
+                    if (string.IsNullOrEmpty(trans.targetNodeGuid)) continue;
+                    if (!visualsByGuid.TryGetValue(trans.targetNodeGuid, out var targetVisual)) continue;
+                    if (!sourceVisual.transitionPorts.TryGetValue(field.Name, out var port)) continue;
+
+                    var edge = new StateEdge { output = port, input = targetVisual.inputPort };
+                    port.Connect(edge);
+                    targetVisual.inputPort.Connect(edge);
+                    AddElement(edge);
                 }
             }
+
+            ClearSelection();
+            foreach (var visual in visualsByGuid.Values) {
+                visual.Select(this, true);
+            }
+
+            EditorUtility.SetDirty(asset);
         }
 
-        private void ClearTransitionData(StateNodeAsset nodeData) {
-            var fields = nodeData.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance);
-            foreach (var field in fields) {
-                if (field.FieldType == typeof(StateTransition)) {
-                    field.SetValue(nodeData, new StateTransition());
+        private static FieldInfo[] GetTransitionFields(StateNodeAsset nodeData) {
+            return nodeData.GetType()
+                .GetFields(BindingFlags.Public | BindingFlags.Instance)
+                .Where(f => f.FieldType == typeof(StateTransition))
+                .ToArray();
+        }
+
+        private void RemapTransitionData(StateNodeAsset clone, Dictionary<string, StateNodeAsset> clonesByOldGuid) {
+            foreach (var field in GetTransitionFields(clone)) {
+                var oldGuid = (field.GetValue(clone) as StateTransition)?.targetNodeGuid;
+
+                if (!string.IsNullOrEmpty(oldGuid) && clonesByOldGuid.TryGetValue(oldGuid, out var target)) {
+                    field.SetValue(clone, new StateTransition {
+                        targetNodeGuid = target.guid,
+                        targetState = target
+                    });
+                }
+                else {
+                    field.SetValue(clone, new StateTransition());
                 }
             }
         }

@@ -6,7 +6,8 @@ namespace Majinfwork.StateGraph {
         [SerializeField] private StateGraphAsset graphTemplate;
         private StateGraphAsset runtimeGraph;
         private StateNodeAsset activeState;
-        private bool newStateBegin;
+        // True while activeState is queued to Begin() but has not begun yet.
+        private bool beginPending;
 
         public StateNodeAsset CurrentState => activeState;
 
@@ -19,19 +20,24 @@ namespace Majinfwork.StateGraph {
         void Update() {
             if (runtimeGraph == null) return;
 
-            if (newStateBegin) {
-                newStateBegin = false;
+            if (beginPending) {
+                beginPending = false;
                 activeState?.Begin();
             }
             else {
                 activeState?.Tick();
             }
-        } 
+        }
 
         public void TransitionTo(StateNodeAsset next) {
             if (activeState != null) {
                 activeState.onTransitionTriggered -= OnStateRequestedTransition;
-                activeState.End();
+
+                // Only end a state that actually began. A runner initialised
+                // externally and then again by Start() (GameInstance.Construct
+                // does exactly this) would otherwise call End() on an entry
+                // state whose Begin() never ran.
+                if (!beginPending) activeState.End();
             }
 
             if (next != null) {
@@ -39,7 +45,7 @@ namespace Majinfwork.StateGraph {
             }
 
             activeState = next;
-            newStateBegin = true;
+            beginPending = true;
         }
 
         private void OnStateRequestedTransition(StateTransition transition) {
@@ -52,6 +58,7 @@ namespace Majinfwork.StateGraph {
 
         public void SetRuntimeGraph(StateGraphAsset asset) {
             runtimeGraph = asset;
+            if (runtimeGraph == null) return;
 
             var entry = runtimeGraph.allStates.FirstOrDefault(s => s.guid == runtimeGraph.entryNodeGuid);
             if (entry != null) {
