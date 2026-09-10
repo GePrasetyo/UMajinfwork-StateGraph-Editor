@@ -10,6 +10,19 @@ namespace Majinfwork.StateGraph {
         public List<StateNodeAsset> allStates = new List<StateNodeAsset>();
         public bool SharedAsset;
 
+        private int preparedCount = -1;
+
+        /// <summary>Assigns each state its data-slot index. Idempotent.</summary>
+        public void PrepareRuntimeIndices() {
+            if (preparedCount == allStates.Count) return;
+
+            for (int i = 0; i < allStates.Count; i++) {
+                if (allStates[i] != null) allStates[i].RuntimeIndex = i;
+            }
+
+            preparedCount = allStates.Count;
+        }
+
 #if HAS_MAJINFWORK_CROSSREF
         // String constants for reflection-based cross-scene reference support
         private const string CrossSceneExtensionTypeName = "Majinfwork.CrossRef.CrossSceneCloneExtension";

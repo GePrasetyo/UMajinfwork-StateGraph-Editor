@@ -5,20 +5,21 @@ namespace Majinfwork.StateGraph {
         public StateTransition Exit;
 
         public float waitTime;
-        private float timer;
 
-        public override void Begin() {
-            timer = waitTime;
+        private sealed class Data {
+            public float timer;
         }
 
-        public override void Tick() { 
-            timer -= Time.deltaTime;
-
-            if (timer < 0) {
-                TriggerExit(Exit);
-            }
+        public override void Begin(StateContext ctx) {
+            ctx.GetData<Data>(this).timer = waitTime;
         }
 
-        public override void End() { }
+        public override void Tick(StateContext ctx) {
+            var data = ctx.GetData<Data>(this);
+            data.timer -= Time.deltaTime;
+
+            if (data.timer < 0) TriggerExit(Exit);
+        }
+
     }
 }

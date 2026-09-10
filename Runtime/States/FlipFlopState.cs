@@ -1,24 +1,17 @@
-using UnityEngine;
-
 namespace Majinfwork.StateGraph {
     public sealed class FlipFlopState : StateNodeAsset {
         public StateTransition ExitA;
         public StateTransition ExitB;
 
-        public int index;
-
-        public override void Begin() {
-            index++;
-
-            if (index % 2 == 0) {
-                TriggerExit(ExitB);
-            }
-            else {
-                TriggerExit(ExitA);
-            }
+        private sealed class Data {
+            public int index;
         }
 
-        public override void Tick() { }
-        public override void End() { }
+        public override void Begin(StateContext ctx) {
+            var data = ctx.GetData<Data>(this);
+            data.index++;
+
+            TriggerExit(data.index % 2 == 0 ? ExitB : ExitA);
+        }
     }
 }

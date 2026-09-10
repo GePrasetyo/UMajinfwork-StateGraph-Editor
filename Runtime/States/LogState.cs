@@ -6,14 +6,10 @@ namespace Majinfwork.StateGraph {
 
         public string message = "Hello World";
         public Color logColor = Color.white;
-        
 
-        public override void Begin() {
+        public override void Begin(StateContext ctx) {
             Debug.Log(message);
-            TriggerExit(Exit);
+            ctx.Exit(Exit);
         }
-
-        public override void Tick() { }
-        public override void End() { }
     }
 }

@@ -8,7 +8,6 @@ using UnityEngine.TestTools;
 
 namespace MStateGraph.Tests {
 
-    /// <summary>Records the lifecycle calls the runner makes, in order.</summary>
     public class ProbeState : StateNodeAsset {
         public StateTransition Exit;
 
@@ -22,6 +21,31 @@ namespace MStateGraph.Tests {
 
         public override void Tick() => calls.Add(nameof(Tick));
         public override void End() => calls.Add(nameof(End));
+    }
+
+
+    public class SharedProbeState : StateNodeAsset {
+        public StateTransition Exit;
+
+        [NonSerialized] public string exitForRunner;
+
+        private sealed class Data {
+            public int begins;
+            public int ends;
+        }
+
+        public override void Begin(StateContext ctx) => ctx.GetData<Data>(this).begins++;
+
+        public override void Tick(StateContext ctx) {
+            if (!string.IsNullOrEmpty(exitForRunner) && ctx.Runner != null && ctx.Runner.name == exitForRunner) {
+                TriggerExit(Exit);
+            }
+        }
+
+        public override void End(StateContext ctx) => ctx.GetData<Data>(this).ends++;
+
+        public int Begins(StateContext ctx) => ctx.HasData(this) ? ctx.GetData<Data>(this).begins : 0;
+        public int Ends(StateContext ctx) => ctx.HasData(this) ? ctx.GetData<Data>(this).ends : 0;
     }
 
     public class StateGraphTests {
@@ -67,9 +91,6 @@ namespace MStateGraph.Tests {
             Assert.IsNull(transition.targetState);
         }
 
-        // Regression: GameInstance.Construct initialises the runner, then Unity
-        // calls Start() which initialises it again. The entry state must not be
-        // ended before its Begin() has ever run.
         [UnityTest]
         public IEnumerator Runner_DoesNotEndAStateThatNeverBegan() {
             if (!RequirePlayMode()) yield break;
@@ -79,7 +100,6 @@ namespace MStateGraph.Tests {
             var go = new GameObject("runner");
             var runner = go.AddComponent<StateRunner>();
 
-            // Mimic GameInstance.Construct: initialise before Start() runs.
             runner.SetGraph(graph);
             runner.SetRuntimeGraph(graph);
 
@@ -201,5 +221,137 @@ namespace MStateGraph.Tests {
             Assert.AreEqual(clone.entryNodeGuid, clone.allStates[0].guid,
                 "Entry guid must still resolve to a node inside the clone.");
         }
+
+        private static SharedProbeState NewShared(string name) {
+            var state = ScriptableObject.CreateInstance<SharedProbeState>();
+            state.name = name;
+            state.guid = Guid.NewGuid().ToString();
+            return state;
+        }
+
+        private static StateGraphAsset BuildSharedGraph(params SharedProbeState[] states) {
+            var graph = ScriptableObject.CreateInstance<StateGraphAsset>();
+            graph.SharedAsset = true;
+            graph.allStates.AddRange(states);
+            graph.entryNodeGuid = states[0].guid;
+            return graph;
+        }
+
+        [UnityTest]
+        public IEnumerator SharedGraph_OneAgentTransitioning_DoesNotMoveTheOther() {
+            if (!RequirePlayMode()) yield break;
+
+            var chase = NewShared("Chase");
+            var attack = NewShared("Attack");
+            chase.Exit = new StateTransition { targetNodeGuid = attack.guid, targetState = attack };
+            chase.exitForRunner = "agent-1";
+
+            var graph = BuildSharedGraph(chase, attack);
+
+            var go1 = new GameObject("agent-1");
+            var go2 = new GameObject("agent-2");
+            var r1 = go1.AddComponent<StateRunner>();
+            var r2 = go2.AddComponent<StateRunner>();
+            r1.SetGraph(graph);
+            r2.SetGraph(graph);
+
+            yield return null; // Start + Begin
+            yield return null; // Tick -> agent-1 exits
+            yield return null; // agent-1 begins Attack
+
+            Assert.AreSame(attack, r1.CurrentState, "agent-1 should have moved to Attack.");
+            Assert.AreSame(chase, r2.CurrentState, "agent-2 must not be dragged along by agent-1.");
+
+            UnityEngine.Object.Destroy(go1);
+            UnityEngine.Object.Destroy(go2);
+        }
+
+        [UnityTest]
+        public IEnumerator SharedGraph_PerAgentDataIsIsolated() {
+            if (!RequirePlayMode()) yield break;
+
+            var chase = NewShared("Chase");
+            var attack = NewShared("Attack");
+            chase.Exit = new StateTransition { targetNodeGuid = attack.guid, targetState = attack };
+            chase.exitForRunner = "agent-1";
+
+            var graph = BuildSharedGraph(chase, attack);
+
+            var go1 = new GameObject("agent-1");
+            var go2 = new GameObject("agent-2");
+            var r1 = go1.AddComponent<StateRunner>();
+            var r2 = go2.AddComponent<StateRunner>();
+            r1.SetGraph(graph);
+            r2.SetGraph(graph);
+
+            yield return null;
+            yield return null;
+            yield return null;
+
+            Assert.AreEqual(1, chase.Begins(r1.Context), "agent-1 entered Chase once.");
+            Assert.AreEqual(1, chase.Begins(r2.Context), "agent-2 entered Chase once.");
+            Assert.AreEqual(1, chase.Ends(r1.Context), "agent-1 left Chase.");
+            Assert.AreEqual(0, chase.Ends(r2.Context), "agent-2 never left Chase.");
+            Assert.AreEqual(1, attack.Begins(r1.Context), "agent-1 entered Attack.");
+            Assert.AreEqual(0, attack.Begins(r2.Context), "agent-2 never entered Attack.");
+
+            UnityEngine.Object.Destroy(go1);
+            UnityEngine.Object.Destroy(go2);
+        }
+
+        [UnityTest]
+        public IEnumerator SharedGraph_RunsWithoutCloningTheAsset() {
+            if (!RequirePlayMode()) yield break;
+
+            var only = NewShared("Idle");
+            var graph = BuildSharedGraph(only);
+
+            var go = new GameObject("agent");
+            var runner = go.AddComponent<StateRunner>();
+            runner.SetGraph(graph);
+
+            yield return null;
+
+            Assert.AreSame(only, runner.CurrentState,
+                "A shared graph must execute the original asset, not a clone.");
+            Assert.IsNotNull(runner.Context);
+
+            UnityEngine.Object.Destroy(go);
+        }
+
+        [Test]
+        public void StateContext_DataIsLazyAndPerNode() {
+            var a = NewShared("A");
+            var b = NewShared("B");
+            var graph = BuildSharedGraph(a, b);
+            graph.PrepareRuntimeIndices();
+
+            var ctx = new StateContext(null, graph.allStates.Count);
+
+            Assert.IsFalse(ctx.HasData(a), "Data should not exist before a state is entered.");
+            Assert.AreEqual(0, a.Begins(ctx));
+
+            a.Begin(ctx);
+
+            Assert.IsTrue(ctx.HasData(a));
+            Assert.IsFalse(ctx.HasData(b), "Entering A must not allocate data for B.");
+            Assert.AreEqual(1, a.Begins(ctx));
+
+            ctx.Reset();
+            Assert.IsFalse(ctx.HasData(a), "Reset should drop per-agent data for pooling.");
+        }
+
+        [Test]
+        public void PrepareRuntimeIndices_AssignsListPositions() {
+            var a = NewShared("A");
+            var b = NewShared("B");
+            var graph = BuildSharedGraph(a, b);
+
+            graph.PrepareRuntimeIndices();
+
+            Assert.AreEqual(0, a.RuntimeIndex);
+            Assert.AreEqual(1, b.RuntimeIndex);
+        }
+
     }
 }
