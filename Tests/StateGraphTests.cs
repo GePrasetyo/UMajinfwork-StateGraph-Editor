@@ -48,6 +48,17 @@ namespace MStateGraph.Tests {
         public int Ends(StateContext ctx) => ctx.HasData(this) ? ctx.GetData<Data>(this).ends : 0;
     }
 
+    public abstract class PrivateExitBase : StateNodeAsset {
+        [SerializeField] private StateTransition next;
+
+        public StateTransition Next {
+            get => next;
+            set => next = value;
+        }
+    }
+
+    public class InheritedExitState : PrivateExitBase { }
+
     public class StateGraphTests {
 
         private static ProbeState NewState(string name) {
@@ -351,6 +362,91 @@ namespace MStateGraph.Tests {
 
             Assert.AreEqual(0, a.RuntimeIndex);
             Assert.AreEqual(1, b.RuntimeIndex);
+        }
+
+        [Test]
+        public void Clone_RemapsInheritedPrivateTransitions() {
+            var first = ScriptableObject.CreateInstance<InheritedExitState>();
+            first.guid = Guid.NewGuid().ToString();
+            var second = NewState("Second");
+            first.Next = new StateTransition { targetNodeGuid = second.guid, targetState = second };
+
+            var graph = ScriptableObject.CreateInstance<StateGraphAsset>();
+            graph.allStates.Add(first);
+            graph.allStates.Add(second);
+            graph.entryNodeGuid = first.guid;
+
+            var clone = graph.Clone();
+
+            Assert.AreSame(clone.allStates[1], ((InheritedExitState)clone.allStates[0]).Next.targetState,
+                "A private transition declared on a base class still points at the original asset.");
+        }
+
+        [UnityTest]
+        public IEnumerator Exit_FromAStateAlreadyLeft_IsIgnored() {
+            if (!RequirePlayMode()) yield break;
+
+            var first = NewState("First");
+            var second = NewState("Second");
+            var third = NewState("Third");
+            Link(first, third);
+            var graph = BuildGraph(shared: true, first, second, third);
+
+            var go = new GameObject("runner");
+            var runner = go.AddComponent<StateRunner>();
+            runner.SetGraph(graph);
+
+            yield return null; // First begins
+            runner.TransitionTo(second);
+            yield return null; // Second begins
+
+            runner.Context.Exit(first.Exit); // First's async work finishing late
+            yield return null;
+
+            Assert.AreSame(second, runner.CurrentState);
+
+            UnityEngine.Object.Destroy(go);
+        }
+
+        [UnityTest]
+        public IEnumerator ExitToken_IsCancelledWhenTheStateEnds() {
+            if (!RequirePlayMode()) yield break;
+
+            var first = NewState("First");
+            var second = NewState("Second");
+            var graph = BuildGraph(shared: true, first, second);
+
+            var go = new GameObject("runner");
+            var runner = go.AddComponent<StateRunner>();
+            runner.SetGraph(graph);
+
+            yield return null; // First begins
+
+            var token = runner.Context.ExitToken;
+            Assert.IsTrue(token.CanBeCanceled);
+            Assert.IsFalse(token.IsCancellationRequested);
+
+            runner.TransitionTo(second);
+            Assert.IsTrue(token.IsCancellationRequested);
+
+            UnityEngine.Object.Destroy(go);
+        }
+
+        [UnityTest]
+        public IEnumerator DestroyingTheRunner_EndsTheActiveState() {
+            if (!RequirePlayMode()) yield break;
+
+            var first = NewState("First");
+            var graph = BuildGraph(shared: true, first);
+
+            var go = new GameObject("runner");
+            var runner = go.AddComponent<StateRunner>();
+            runner.SetGraph(graph);
+
+            yield return null; // First begins
+            UnityEngine.Object.DestroyImmediate(go);
+
+            CollectionAssert.Contains(first.calls, "End");
         }
 
     }

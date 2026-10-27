@@ -83,21 +83,17 @@ namespace Majinfwork.StateGraph {
             foreach (var data in this.asset.allStates) {
                 var sourceVisual = visualNodes[data.guid];
 
-                // Look for fields of type StateTransition
-                var fields = data.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance);
-                foreach (var field in fields) {
-                    if (field.FieldType == typeof(StateTransition)) {
-                        var transition = field.GetValue(data) as StateTransition;
-                        if (transition != null && !string.IsNullOrEmpty(transition.targetNodeGuid)) {
-                            if (visualNodes.TryGetValue(transition.targetNodeGuid, out var targetVisual)) {
-                                var port = sourceVisual.transitionPorts[field.Name];
-                                var edge = new StateEdge();
-                                edge.output = port;
-                                edge.input = targetVisual.inputPort;
-                                port.Connect(edge);
-                                targetVisual.inputPort.Connect(edge);
-                                AddElement(edge);
-                            }
+                foreach (var field in StateTransitionFields.Of(data.GetType())) {
+                    var transition = field.GetValue(data) as StateTransition;
+                    if (transition != null && !string.IsNullOrEmpty(transition.targetNodeGuid)) {
+                        if (visualNodes.TryGetValue(transition.targetNodeGuid, out var targetVisual)
+                            && sourceVisual.transitionPorts.TryGetValue(field.Name, out var port)) {
+                            var edge = new StateEdge();
+                            edge.output = port;
+                            edge.input = targetVisual.inputPort;
+                            port.Connect(edge);
+                            targetVisual.inputPort.Connect(edge);
+                            AddElement(edge);
                         }
                     }
                 }
@@ -150,7 +146,7 @@ namespace Majinfwork.StateGraph {
                     if (source?.data == null || target?.data == null) continue;
                     string fieldName = edge.output.viewDataKey;
 
-                    var field = source.data.GetType().GetField(fieldName);
+                    var field = StateTransitionFields.Find(source.data.GetType(), fieldName);
                     if (field != null) {
                         Undo.RecordObject(source.data, "Connect Nodes");
                         var trans = field.GetValue(source.data) as StateTransition ?? new StateTransition();
@@ -181,8 +177,8 @@ namespace Majinfwork.StateGraph {
                     if (edge.output?.node is not StateNodeVisual source) continue;
                     if (source.data == null || removedNodes.Contains(source.data)) continue;
 
-                    var field = source.data.GetType().GetField(edge.output.viewDataKey);
-                    if (field == null || field.FieldType != typeof(StateTransition)) continue;
+                    var field = StateTransitionFields.Find(source.data.GetType(), edge.output.viewDataKey);
+                    if (field == null) continue;
 
                     Undo.RecordObject(source.data, "Disconnect Nodes");
                     field.SetValue(source.data, new StateTransition());
@@ -320,12 +316,7 @@ namespace Majinfwork.StateGraph {
             EditorUtility.SetDirty(asset);
         }
 
-        private static FieldInfo[] GetTransitionFields(StateNodeAsset nodeData) {
-            return nodeData.GetType()
-                .GetFields(BindingFlags.Public | BindingFlags.Instance)
-                .Where(f => f.FieldType == typeof(StateTransition))
-                .ToArray();
-        }
+        private static FieldInfo[] GetTransitionFields(StateNodeAsset nodeData) => StateTransitionFields.Of(nodeData.GetType());
 
         private void RemapTransitionData(StateNodeAsset clone, Dictionary<string, StateNodeAsset> clonesByOldGuid) {
             foreach (var field in GetTransitionFields(clone)) {
@@ -345,17 +336,12 @@ namespace Majinfwork.StateGraph {
 
         private void ClearReferencesTo(StateNodeAsset state, string targetGuid) {
             bool changed = false;
-            var fields = state.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance);
-
-            foreach (var field in fields) {
-                if (field.FieldType == typeof(StateTransition)) {
-                    var trans = field.GetValue(state) as StateTransition;
-                    if (trans != null && trans.targetNodeGuid == targetGuid) {
-                        // Null out the references
-                        trans.targetNodeGuid = string.Empty;
-                        trans.targetState = null;
-                        changed = true;
-                    }
+            foreach (var field in StateTransitionFields.Of(state.GetType())) {
+                var trans = field.GetValue(state) as StateTransition;
+                if (trans != null && trans.targetNodeGuid == targetGuid) {
+                    trans.targetNodeGuid = string.Empty;
+                    trans.targetState = null;
+                    changed = true;
                 }
             }
 

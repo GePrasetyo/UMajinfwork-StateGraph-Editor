@@ -31,13 +31,23 @@ namespace Majinfwork.StateGraph {
             }
         }
 
+        void OnDestroy() {
+            EndActiveState();
+            activeState = null;
+        }
+
         private void Run(StateNodeAsset state, bool begin) {
             var previous = StateContext.Current;
             StateContext.Current = context;
 
             try {
-                if (begin) state.Begin(context);
-                else state.Tick(context);
+                if (begin) {
+                    context.BeginState();
+                    state.Begin(context);
+                }
+                else {
+                    state.Tick(context);
+                }
             }
             finally {
                 StateContext.Current = previous;
@@ -48,20 +58,7 @@ namespace Majinfwork.StateGraph {
         }
 
         public void TransitionTo(StateNodeAsset next) {
-            if (activeState != null) {
-                activeState.onTransitionTriggered -= OnStateRequestedTransition;
-
-                // GameInstance.Construct initialises, then Start() does it again.
-                if (!beginPending) {
-                    var previous = StateContext.Current;
-                    StateContext.Current = context;
-
-                    try { activeState.End(context); }
-                    finally { StateContext.Current = previous; }
-
-                    context?.ClearRequest();
-                }
-            }
+            EndActiveState();
 
             if (next != null) {
                 next.onTransitionTriggered += OnStateRequestedTransition;
@@ -69,6 +66,24 @@ namespace Majinfwork.StateGraph {
 
             activeState = next;
             beginPending = true;
+        }
+
+        private void EndActiveState() {
+            if (activeState == null) return;
+
+            activeState.onTransitionTriggered -= OnStateRequestedTransition;
+
+            // A state queued but not begun has nothing to end.
+            if (beginPending) return;
+
+            context.EndState();
+            var previous = StateContext.Current;
+            StateContext.Current = context;
+
+            try { activeState.End(context); }
+            finally { StateContext.Current = previous; }
+
+            context.ClearRequest();
         }
 
         private void OnStateRequestedTransition(StateTransition transition) {

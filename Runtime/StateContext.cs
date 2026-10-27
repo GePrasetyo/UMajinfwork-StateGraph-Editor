@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace Majinfwork.StateGraph {
     /// <summary>Per-runner state, so one graph asset can run on many agents.</summary>
@@ -11,6 +12,10 @@ namespace Majinfwork.StateGraph {
 
         private object[] slots;
         private StateTransition requested;
+        private CancellationTokenSource exitSource;
+
+        /// <summary>Cancelled when the running state ends: async work it started stops with it.</summary>
+        public CancellationToken ExitToken => exitSource?.Token ?? CancellationToken.None;
 
         public StateContext(StateRunner runner, int nodeCount) {
             Runner = runner;
@@ -38,7 +43,26 @@ namespace Majinfwork.StateGraph {
         }
 
         public void Exit(StateTransition transition) {
-            if (transition != null) requested = transition;
+            if (transition == null) return;
+
+            // Async work of a state that has already ended must not move the runner on from the state it is in now.
+            var active = Runner != null ? Runner.CurrentState : null;
+            if (active != null && !StateTransitionFields.Owns(active, transition)) return;
+
+            requested = transition;
+        }
+
+        internal void BeginState() {
+            exitSource?.Dispose();
+            exitSource = new CancellationTokenSource();
+        }
+
+        internal void EndState() {
+            if (exitSource == null) return;
+
+            exitSource.Cancel();
+            exitSource.Dispose();
+            exitSource = null;
         }
 
         internal StateTransition ConsumeRequest() {
@@ -53,6 +77,7 @@ namespace Majinfwork.StateGraph {
         public void Reset() {
             Array.Clear(slots, 0, slots.Length);
             requested = null;
+            EndState();
         }
     }
 }
