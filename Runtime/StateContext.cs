@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using UnityEngine;
 
 namespace Majinfwork.StateGraph {
     /// <summary>Per-runner state, so one graph asset can run on many agents.</summary>
@@ -45,9 +46,14 @@ namespace Majinfwork.StateGraph {
         public void Exit(StateTransition transition) {
             if (transition == null) return;
 
+            if (transition.owner < 0) {
+                Debug.LogError("This exit belongs to no state. The State Graph importer sets each exit's owner when it bakes the graph.", Runner);
+                return;
+            }
+
             // Async work of a state that has already ended must not move the runner on from the state it is in now.
             var active = Runner != null ? Runner.CurrentState : null;
-            if (active != null && !StateTransitionFields.Owns(active, transition)) return;
+            if (active != null && transition.owner != active.RuntimeIndex) return;
 
             requested = transition;
         }

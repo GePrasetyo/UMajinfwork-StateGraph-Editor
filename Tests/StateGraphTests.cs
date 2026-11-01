@@ -76,8 +76,9 @@ namespace MStateGraph.Tests {
             return graph;
         }
 
+        // The importer bakes each exit's owner: the index of its state in the graph. In these tests it's the first state.
         private static void Link(ProbeState from, ProbeState to) {
-            from.Exit = new StateTransition { targetNodeGuid = to.guid, targetState = to };
+            from.Exit = new StateTransition { targetNodeGuid = to.guid, targetState = to, owner = 0 };
         }
 
         private static bool RequirePlayMode() {
@@ -254,7 +255,7 @@ namespace MStateGraph.Tests {
 
             var chase = NewShared("Chase");
             var attack = NewShared("Attack");
-            chase.Exit = new StateTransition { targetNodeGuid = attack.guid, targetState = attack };
+            chase.Exit = new StateTransition { targetNodeGuid = attack.guid, targetState = attack, owner = 0 };
             chase.exitForRunner = "agent-1";
 
             var graph = BuildSharedGraph(chase, attack);
@@ -283,7 +284,7 @@ namespace MStateGraph.Tests {
 
             var chase = NewShared("Chase");
             var attack = NewShared("Attack");
-            chase.Exit = new StateTransition { targetNodeGuid = attack.guid, targetState = attack };
+            chase.Exit = new StateTransition { targetNodeGuid = attack.guid, targetState = attack, owner = 0 };
             chase.exitForRunner = "agent-1";
 
             var graph = BuildSharedGraph(chase, attack);
@@ -369,7 +370,7 @@ namespace MStateGraph.Tests {
             var first = ScriptableObject.CreateInstance<InheritedExitState>();
             first.guid = Guid.NewGuid().ToString();
             var second = NewState("Second");
-            first.Next = new StateTransition { targetNodeGuid = second.guid, targetState = second };
+            first.Next = new StateTransition { targetNodeGuid = second.guid, targetState = second, owner = 0 };
 
             var graph = ScriptableObject.CreateInstance<StateGraphAsset>();
             graph.allStates.Add(first);
@@ -406,6 +407,14 @@ namespace MStateGraph.Tests {
             Assert.AreSame(second, runner.CurrentState);
 
             UnityEngine.Object.Destroy(go);
+        }
+
+        [Test]
+        public void Exit_WithoutOwner_IsRefusedLoudly() {
+            var context = new StateContext(null, 1);
+
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("belongs to no state"));
+            context.Exit(new StateTransition());
         }
 
         [UnityTest]

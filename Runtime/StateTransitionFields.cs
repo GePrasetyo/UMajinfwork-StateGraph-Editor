@@ -24,22 +24,5 @@ namespace Majinfwork.StateGraph {
             cache[type] = fields;
             return fields;
         }
-
-        public static FieldInfo Find(Type type, string name) {
-            foreach (var field in Of(type)) {
-                if (field.Name == name) return field;
-            }
-
-            return null;
-        }
-
-        /// <summary>Whether <paramref name="transition"/> is one of <paramref name="state"/>'s exits.</summary>
-        public static bool Owns(StateNodeAsset state, StateTransition transition) {
-            foreach (var field in Of(state.GetType())) {
-                if (ReferenceEquals(field.GetValue(state), transition)) return true;
-            }
-
-            return false;
-        }
     }
 }

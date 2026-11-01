@@ -1,8 +1,8 @@
 {
   "name": "com.majingari.stategraph",
   "displayName": "Majingari State Graph",
-  "version": "0.0.1-preview",
-  "description": "Majingari State Graph.",
+  "version": "0.1.0",
+  "description": "Majingari State Graph: a barebone state machine whose graphs are authored in Unity Graph Toolkit and baked into ScriptableObject states.",
   "unity": "6000.6",
   "unityRelease": "0f1",
   "documentationUrl": "https://github.com/GePrasetyo/UMajinfwork-StateGraph-Editor/wiki/Documentation",

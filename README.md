@@ -1,42 +1,42 @@
 # 🕸️ Majinfwork - Unity State Graph
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Unity-6.4%2B-black?style=flat-square&logo=unity" alt="Unity 6.4+"/>
+  <img src="https://img.shields.io/badge/Unity-6.6%2B-black?style=flat-square&logo=unity" alt="Unity 6.6+"/>
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License"/>
-  <img src="https://img.shields.io/badge/Version-0.0.1--preview-blue?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-0.1.0-blue?style=flat-square" alt="Version"/>
 </p>
 
-**Majinfwork State Graph** is a **barebone** state machine tool for Unity designed for developers who prefer a minimalist starting point. States are plain ScriptableObjects executed by a direct virtual call — no graph interpretation at runtime — and authoring runs on Unity's Graph Toolkit.
-
-<img width="1695" height="893" alt="image" src="https://github.com/user-attachments/assets/53938a0d-2ba2-40fe-bf1a-d7b321cc2f1a" />
+**Majinfwork State Graph** is a **barebone** state machine tool for Unity designed for developers who prefer a minimalist starting point. States are plain ScriptableObjects executed by a direct virtual call — no graph interpretation at runtime — and graphs are authored in Unity's Graph Toolkit.
 
 ## 🚀 Features
 
-*   **Visual Node Editor:** A custom GraphView-based editor. Node fields are drawn with `PropertyField`, so every custom `PropertyDrawer` and attribute works, and backward transitions route orthogonally instead of cutting through nodes.
-*   **ScriptableObject Backend:** Graphs and nodes are saved as assets, making them highly reusable and memory-efficient.
-*   **Runtime Debugging:** Real-time visual highlighting of the currently active state during Play Mode.
+*   **Graph Toolkit Editor:** Graphs are `.mstategraph` files edited in Unity's Graph Toolkit. Each node draws its state's fields through the state's own serialization, so every `PropertyDrawer` and attribute works. Long wires, such as a loop back to an earlier state, can be turned into **portals** (right-click a wire > **Convert to Portals**).
+*   **Baked, Not Interpreted:** An importer bakes each graph into a `StateGraphAsset` with one ScriptableObject per state. Every exit knows the state it belongs to, so the runtime never searches for it.
+*   **Runtime Debugging:** In Play Mode, open graphs mark the running states: the selected runner's state when a runner is selected, every runner's otherwise.
 *   **Shared Graphs:** One graph asset drives any number of agents with no per-spawn clone (0.17 us / 92 B per agent, versus 1.39 ms / 2.9 KB to clone).
 *   **Decoupled Logic:** Separate your game logic (States) from your physical actors.
-*   **Majingari Integration:** Built-in support for resolving cross-scene references when used alongside the **Majingari Framework**.
 
 ---
 
 ## 🛠️ Core Components
 
-### **1. State Graph Asset**
-The container for your state machine. It stores all node data and identifies the **Entry Node** where the logic begins.
+### **1. State Graph (`.mstategraph`)**
+The authored graph: an **Entry** node and one node per state, wired from exits to **Enter** ports.
 
-### **2. State Node Asset**
+### **2. State Graph Asset**
+What the importer bakes from a State Graph and what a runner runs. It holds the states and the entry state. Assign the `.mstategraph` itself wherever a `StateGraphAsset` is expected.
+
+### **3. State Node Asset**
 The base class for all individual states. Override the lifecycle you need:
 *   `Begin(StateContext)` / `Tick(StateContext)` / `End(StateContext)` — for states
     shared across many agents. Keep mutable data in `ctx.GetData<T>(this)`.
 *   `Begin()` / `Tick()` / `End()` — for states there is only ever one of.
 
-### **3. State Runner**
+### **4. State Runner**
 A MonoBehaviour component that lives on your GameObjects. It holds the **Runtime Graph** and manages the transition between states.
 
-### **4. State Transition**
-A simple class used to define "Exit" ports on your nodes. These appear as output ports in the editor, allowing you to visually link nodes.
+### **5. State Transition**
+A field type that declares an exit. Each `StateTransition` field becomes an output port on the state's node.
 
 ---
 
@@ -44,29 +44,28 @@ A simple class used to define "Exit" ports on your nodes. These appear as output
 
 ### **Creating a New Graph**
 1.  Right-click in the Project window.
-2.  Select **MFramework > State Machine > Graph Asset**.
-3.  Double-click the asset to open the **State Machine Editor**.
+2.  Select **MFramework > State Machine > State Graph**.
+3.  Double-click the graph to open it in Graph Toolkit.
 
-### **Adding and Connecting Nodes**
-*   **Create Nodes:** Right-click inside the editor or press spacebar to open the
-    search window, which lists every `StateNodeAsset` type in the project. The node
-    is created as a sub-asset of the graph.
-*   **Edit State Data:** Serialized fields are drawn inside the node itself.
-*   **Set Entry:** The first node becomes the entry automatically. Right-click any
-    node and choose **Set as Entry Node** to change it.
-*   **Connect:** Drag from an **Output Port** (a `StateTransition` field) to another
-    node's **Enter** port.
+### **Making a State Available in Graphs**
+Graph Toolkit lists one node class per entry, so each state type gets a one-line node class in an Editor assembly that references `MState_Editor`:
 
-Assign the graph asset to a `StateRunner` and press play. There is no build step —
-the asset you author is the asset that runs.
+```csharp
+using System;
+using Majinfwork.StateGraph;
 
-### **Optional: Graph Toolkit front-end**
-`Editor/Gtk/` holds an experimental Graph Toolkit front-end that authors a
-`.mstategraph` and bakes into a `StateGraphAsset`. It is not the primary editor:
-Graph Toolkit has no public API for custom property drawers or nested
-`[Serializable]` types, so states holding those — anything using
-`[CrossSceneReference]`, for instance — cannot be edited on the node. It also has
-no wire routing; backward transitions are tidied manually with portals.
+[Serializable] public class ChaseStateNode : StateNode<ChaseState> { }
+```
+
+### **Building the Graph**
+*   **Add States:** Press space or right-click in the graph and pick a state.
+*   **Edit State Data:** The state's fields are drawn inside its node. Its exits are the node's ports.
+*   **Name a State:** Select its node and set **Name** in the Graph Inspector. The node shows the name, and the baked state is called by it.
+*   **Set the Entry:** Wire the **Entry** node's **Start** port to the first state. A graph has exactly one Entry.
+*   **Connect:** Drag from an exit port to another node's **Enter** port.
+*   **Portals:** Right-click a wire and choose **Convert to Portals** to replace it with a pair of short stubs.
+
+Saving the graph bakes it. Assign the graph to a `StateRunner` and press play.
 
 ### **Standard Node Library**
 The package includes several pre-built states to get you started:
@@ -116,8 +115,7 @@ public class ChaseState : StateNodeAsset {
 }
 ```
 
-Set **Shared Asset** on the graph (the `Entry` node's option in the Graph Toolkit
-editor, or the `SharedAsset` field on `StateGraphAsset`).
+Turn on **Shared Asset** on the graph's **Entry** node.
 
 ### Single-instance state — mutable fields are fine
 
@@ -146,30 +144,21 @@ stack. After an `await`, capture the context and use it directly:
 public override void Begin(StateContext ctx) => LoadAsync(ctx);
 
 private async void LoadAsync(StateContext ctx) {
-    await SomeOperation();
+    await SomeOperation(ctx.ExitToken);
     ctx.Exit(onComplete); // picked up on the next tick
 }
 ```
 
-### Reporting progress
-
-Implement `IStateProgress` and the Graph Toolkit editor draws a fill bar on the
-running node during Play Mode.
-
-```csharp
-public float GetProgress(StateContext ctx) => /* 0..1 for this agent */;
-```
+`ctx.ExitToken` is cancelled when the state ends. An exit that arrives after its state has ended is ignored: every exit knows the state it belongs to.
 
 ---
 
 ## 🔗 Framework Integration
 
-If you are using the core **Majingari Framework**, the State Graph automatically supports **Cross-Scene References**.
-*   Nodes can reference objects in different scenes using the `[CrossSceneReference]` attribute.
-*   The `StateGraphAsset` will automatically resolve these links when cloned for runtime use.
+With the core **Majingari Framework**, a state can point at objects in scenes through a `CrossSceneRef<T>` field. Pick the object on the node; the field keeps the id of the object's `CrossSceneAnchor` and resolves it at runtime while its scene is loaded.
 
 ---
 
 ## ⚙️ Requirements
-*   **Unity:** 6000.3.1f1 or newer. The optional Graph Toolkit front-end needs 6000.4+.
-*   **Dependencies:** Core Majingari Framework (Optional, for cross-scene support).
+*   **Unity:** 6000.6 or newer (Graph Toolkit).
+*   **Dependencies:** Core Majingari Framework (optional, for cross-scene references).
