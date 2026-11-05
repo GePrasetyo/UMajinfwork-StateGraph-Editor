@@ -59,6 +59,11 @@ namespace MStateGraph.Tests {
 
     public class InheritedExitState : PrivateExitBase { }
 
+    public class ListExitState : StateNodeAsset {
+        public StateTransition[] exits = Array.Empty<StateTransition>();
+        public List<StateTransition> moreExits = new List<StateTransition>();
+    }
+
     public class StateGraphTests {
 
         private static ProbeState NewState(string name) {
@@ -219,6 +224,36 @@ namespace MStateGraph.Tests {
                 "Cloned transition still points at the original asset.");
             Assert.AreSame(second, first.Exit.targetState,
                 "Cloning must not rewrite the original graph.");
+        }
+
+        [Test]
+        public void Clone_RemapsExitListsOntoClonedNodes() {
+            var hub = ScriptableObject.CreateInstance<ListExitState>();
+            hub.guid = Guid.NewGuid().ToString();
+            var first = NewState("First");
+            var second = NewState("Second");
+            hub.exits = new[] {
+                new StateTransition { targetNodeGuid = first.guid, targetState = first, owner = 0 },
+                new StateTransition { targetNodeGuid = second.guid, targetState = second, owner = 0 }
+            };
+            hub.moreExits = new List<StateTransition> { new StateTransition { targetNodeGuid = second.guid, targetState = second, owner = 0 } };
+
+            var graph = ScriptableObject.CreateInstance<StateGraphAsset>();
+            graph.allStates.Add(hub);
+            graph.allStates.Add(first);
+            graph.allStates.Add(second);
+            graph.entryNodeGuid = hub.guid;
+
+            var clone = graph.Clone();
+            var clonedHub = (ListExitState)clone.allStates[0];
+
+            Assert.AreSame(clone.allStates[1], clonedHub.exits[0].targetState);
+            Assert.AreSame(clone.allStates[2], clonedHub.exits[1].targetState);
+            Assert.AreSame(clone.allStates[2], clonedHub.moreExits[0].targetState);
+            Assert.AreSame(first, hub.exits[0].targetState, "Cloning must not rewrite the original graph.");
+            CollectionAssert.AreEqual(
+                new[] { hub.exits[0], hub.exits[1], hub.moreExits[0] },
+                new List<StateTransition>(StateTransitionFields.Transitions(hub)));
         }
 
         [Test]

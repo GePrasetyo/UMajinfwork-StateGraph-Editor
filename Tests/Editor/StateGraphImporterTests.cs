@@ -5,6 +5,8 @@ using UnityEditor;
 using UnityEngine;
 
 namespace MStateGraph.Tests {
+    [System.Serializable] public class HubStateNode : StateNode<HubState> { }
+
     public class StateGraphImporterTests {
         private const string Path = "Assets/__StateGraphImporterTest." + StateMachineGraph.Extension;
 
@@ -49,6 +51,45 @@ namespace MStateGraph.Tests {
             Assert.AreSame(bakedLog, bakedWait.Exit.targetState);
             Assert.AreEqual(baked.allStates.IndexOf(bakedWait), bakedWait.Exit.owner);
             Assert.IsFalse(baked.SharedAsset);
+        }
+
+        // An exit list gets one port per element, sized by the node's own values, and each element bakes its wire.
+        [Test]
+        public void Import_ExitListGetsAPortPerElement() {
+            var graph = GraphDatabase.CreateGraph<StateMachineGraph>(Path);
+            var entry = new StateGraphEntryNode();
+            var hub = new HubStateNode();
+            var log = new LogStateNode();
+            var wait = new WaitStateNode();
+            graph.AddNode(entry);
+            graph.AddNode(hub);
+            graph.AddNode(log);
+            graph.AddNode(wait);
+
+            var values = ScriptableObject.CreateInstance<HubState>();
+            values.places = new StateTransition[2];
+            Assert.IsTrue(hub.GetNodeOptionByName(StateNodeIds.FieldsOption).TrySetValue(StateFields<HubState>.Of(values)));
+            Object.DestroyImmediate(values);
+
+            IPort first = hub.GetOutputPortByName("places[0]");
+            IPort second = hub.GetOutputPortByName("places[1]");
+            Assert.IsNotNull(first, "The first element has no port.");
+            Assert.IsNotNull(second, "The second element has no port.");
+            Assert.IsNull(hub.GetOutputPortByName("places[2]"));
+
+            Assert.IsTrue(graph.Connect(entry.GetOutputPortByName(StateGraphEntryNode.StartPort), hub.GetInputPortByName(StateNodeIds.Enter)));
+            Assert.IsTrue(graph.Connect(first, log.GetInputPortByName(StateNodeIds.Enter)));
+            Assert.IsTrue(graph.Connect(second, wait.GetInputPortByName(StateNodeIds.Enter)));
+            GraphDatabase.SaveGraph(graph);
+            AssetDatabase.ImportAsset(Path, ImportAssetOptions.ForceUpdate);
+
+            var baked = AssetDatabase.LoadAssetAtPath<StateGraphAsset>(Path);
+            var bakedHub = baked.allStates.Find(s => s is HubState) as HubState;
+            Assert.AreEqual(2, bakedHub.places.Length);
+            Assert.AreSame(baked.allStates.Find(s => s is LogState), bakedHub.places[0].targetState);
+            Assert.AreSame(baked.allStates.Find(s => s is WaitState), bakedHub.places[1].targetState);
+            Assert.AreEqual(baked.allStates.IndexOf(bakedHub), bakedHub.places[0].owner);
+            Assert.AreEqual(baked.allStates.IndexOf(bakedHub), bakedHub.places[1].owner);
         }
 
         // An exit with no wire still knows its state, so the runner accepts it and simply stays.

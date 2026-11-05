@@ -45,11 +45,11 @@ namespace Majinfwork.StateGraph {
             }
         }
 
-        // Each exit port is named after its StateTransition field.
+        // Each exit port is named after its StateTransition field, or its exit list's element ("places[2]").
         private static void Connect(INode node, StateNodeAsset state, int owner, Dictionary<Hash128, StateNodeAsset> states) {
             using var serialized = new SerializedObject(state);
             foreach (IPort port in node.GetOutputPorts()) {
-                SerializedProperty transition = serialized.FindProperty(port.Name);
+                SerializedProperty transition = ExitProperty.Find(serialized, port.Name);
                 if (transition == null) continue;
 
                 StateNodeAsset next = null;

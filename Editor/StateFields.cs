@@ -24,8 +24,8 @@ namespace Majinfwork.StateGraph {
         public override StateNodeAsset CreateState() => ScriptableObject.CreateInstance<TState>();
 
         /// <summary>
-        /// Fields holding a state's current values, for tools that build graphs. Its exits, id and position are left
-        /// out: the graph's wires and nodes own those.
+        /// Fields holding a state's current values, for tools that build graphs. Its exits' targets, id and position are
+        /// left out: the graph's wires and nodes own those. An exit list keeps its size, which sets its ports.
         /// </summary>
         public static StateFields<TState> Of(TState state) {
             TState values = Object.Instantiate(state);
@@ -36,7 +36,14 @@ namespace Majinfwork.StateGraph {
                 SerializedProperty property = serialized.GetIterator();
                 property.NextVisible(true);
                 while (property.NextVisible(false)) {
-                    if (property.type == nameof(StateTransition)) property.boxedValue = new StateTransition();
+                    if (ExitProperty.IsExit(property)) {
+                        property.boxedValue = new StateTransition();
+                    }
+                    else if (ExitProperty.IsExitList(property)) {
+                        for (int i = 0; i < property.arraySize; i++) {
+                            property.GetArrayElementAtIndex(i).boxedValue = new StateTransition();
+                        }
+                    }
                 }
 
                 serialized.ApplyModifiedPropertiesWithoutUndo();

@@ -38,6 +38,16 @@ A MonoBehaviour component that lives on your GameObjects. It holds the **Runtime
 ### **5. State Transition**
 A field type that declares an exit. Each `StateTransition` field becomes an output port on the state's node.
 
+A `StateTransition[]` or `List<StateTransition>` field is a list of exits, for a state that leads to a set of places that grows (a menu's levels, a hub's rooms). Its size is set on the node, and each element gets its own port (`places 1`, `places 2`, ...). Adding a place is a bigger size and one more wire, with no code change:
+
+```csharp
+public class HubState : StateNodeAsset {
+    public StateTransition[] places;
+
+    public void Go(int index) => TriggerExit(places[index]);
+}
+```
+
 ---
 
 ## 📖 Usage Guide
@@ -59,7 +69,7 @@ using Majinfwork.StateGraph;
 
 ### **Building the Graph**
 *   **Add States:** Press space or right-click in the graph and pick a state.
-*   **Edit State Data:** The state's fields are drawn inside its node. Its exits are the node's ports.
+*   **Edit State Data:** The state's fields are drawn inside its node. Its exits are the node's ports; an exit list shows only its size, which sets how many ports it has.
 *   **Name a State:** Select its node and set **Name** in the Graph Inspector. The node shows the name, and the baked state is called by it.
 *   **Set the Entry:** Wire the **Entry** node's **Start** port to the first state. A graph has exactly one Entry.
 *   **Connect:** Drag from an exit port to another node's **Enter** port.

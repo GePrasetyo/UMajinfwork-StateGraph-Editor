@@ -65,14 +65,23 @@ namespace Majinfwork.StateGraph {
         }
     }
 
-    /// <summary>A state's fields without its exits, which are the node's ports.</summary>
+    /// <summary>
+    /// A state's fields without its exits, which are the node's ports. An exit list shows only its size: how many
+    /// ports it has.
+    /// </summary>
     public sealed class StateFieldsEditor : Editor {
         public override VisualElement CreateInspectorGUI() {
             var root = new VisualElement();
             SerializedProperty property = serializedObject.GetIterator();
             property.NextVisible(true);
             while (property.NextVisible(false)) {
-                if (property.type == nameof(StateTransition)) continue;
+                if (ExitProperty.IsExit(property)) continue;
+
+                if (ExitProperty.IsExitList(property)) {
+                    root.Add(new PropertyField(property.FindPropertyRelative("Array.size"), property.displayName));
+                    continue;
+                }
+
                 root.Add(new PropertyField(property.Copy()));
             }
 

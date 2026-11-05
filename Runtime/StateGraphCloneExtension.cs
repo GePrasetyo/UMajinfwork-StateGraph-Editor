@@ -3,14 +3,13 @@ using System.Collections.Generic;
 namespace Majinfwork.StateGraph {
     public static class StateGraphCloneExtension {
         /// <summary>
-        /// Remaps StateTransition.targetState from original assets to their clones.
+        /// Remaps StateTransition.targetState from original assets to their clones, exit lists included.
         /// </summary>
         public static void RemapTransitions(this StateNodeAsset clone, Dictionary<StateNodeAsset, StateNodeAsset> cloneMap) {
             if (clone == null) return;
 
-            foreach (var f in StateTransitionFields.Of(clone.GetType())) {
-                var trans = f.GetValue(clone) as StateTransition;
-                if (trans?.targetState != null && cloneMap.TryGetValue(trans.targetState, out var localClone)) {
+            foreach (var trans in StateTransitionFields.Transitions(clone)) {
+                if (trans.targetState != null && cloneMap.TryGetValue(trans.targetState, out var localClone)) {
                     trans.targetState = localClone;
                 }
             }
